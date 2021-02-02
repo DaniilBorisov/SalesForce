@@ -1,0 +1,631 @@
+<aura:component implements="force:appHostable,flexipage:availableForAllPageTypes,forceCommunity:availableForAllPageTypes"
+                controller="Atmos_UncashedChecks_MainController"
+                access="global" >
+<ltng:require scripts="{!$Resource.saveFilter}" afterScriptsLoaded="{!c.doInit}"/>
+<aura:attribute name="shouldRender" type="Boolean" default="true"/>
+<aura:attribute name="isDoneLoading" type="Boolean" default="false" />
+<aura:attribute name="selectedAccountId" type="String"/>
+<aura:attribute name="currentUserInfo" type="Object"/>
+<aura:attribute name="checkFromDate" type="Date"/>
+<aura:attribute name="checkToDate" type="Date"/>
+<aura:attribute name="tabFromUrl" type="String" />
+<aura:attribute name="renderError" type="Boolean" default="false"/>
+<aura:attribute name="checkStatuses" type="List" />
+<aura:attribute name="checkStatus" type="String" default="ALL"/>
+<aura:attribute name="uncashedChecksObject" type="Object"/>
+<aura:attribute name="currencies" type="List" />
+<aura:attribute name="downloadUrl" type="String"/>
+<aura:attribute name="currency" type="String" default="ALL"/>
+<aura:attribute name="searchText" type="String" default='' />
+<aura:attribute name="initializeComplete" type="boolean" default="false"/>
+<aura:attribute name="page" type="integer" description="using for store page Number" default="1"/>  
+<aura:attribute name="pages" type="integer" description="using for store All Pages page Number"/>  
+<aura:attribute name="pageSize" type="String" default="10" description="using to store number of records per page" />
+<aura:attribute name="totalCount" type="integer" description="total records count store "/>  
+<aura:attribute name="sortField" type="string" default="Check_Date__c" description="Use for selected Column Header"/> 
+<aura:attribute name="isAsc" type="boolean" default="false" description="boolean flag for pass sorting condition to apex class"/> 
+<aura:attribute name="dateToValidate" type="String" default="2019-01-01" />
+<aura:attribute name="dateValidationError" type="Object[]" />
+<aura:handler name="paginationChangeEvent" event="c:Atmos_Worklet_Pagination_Event"  action="{!c.paginationChange}"/> 
+<aura:handler name="customFilterChangeEvent" event="c:Atmos_Worklet_CustomFilter_Event" action="{!c.customFilterChange}"/>
+<aura:handler name="filterChangeEvent" event="c:Atmos_Worklet_Filters_Event" action="{!c.dateChange}"/> 
+<aura:handler name="sortingChangeEvent" event="c:Atmos_Worklet_GenericCustomDataTable_Event" action="{!c.updateColumnSorting}" />
+
+<aura:renderIf isTrue="{!v.renderError}">
+    <c:Atmos_Layout_NoAccess />
+</aura:renderIf>
+<!--<aura:renderIf isTrue="{!v.shouldRender}">-->
+    <div class="contentPanel">    
+        <div class="fullCard letterSpacing">
+            <div class="slds-col slds-m-left_xx-small slds-p-right_x-small slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_12-of-12 slds-p-around_medium slds-p-top_medium">
+                 <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_12-of-12">
+                     <div class="slds-grid slds-wrap">
+                        <div class="slds-grid slds-wrap" >
+                            <div class="slds-grow-none">
+                                <c:Atmos_Worklet_CustomFilter label="Status" options="{!v.checkStatuses}" selectedValue="{!v.checkStatus}"/>
+                            </div>
+                        </div>
+                            <div class="slds-grid slds-wrap">
+                            <div class="slds-grow-none">
+                                <c:Atmos_Worklet_CustomFilter label="Currency" options="{!v.currencies}" selectedValue="{!v.currency}"/>
+                            </div>
+                            </div>
+                        <div class="slds-grid slds-wrap">
+                            <div class="slds-grow-none slds-m-left_xx-large">
+                                <c:Atmos_Worklet_Filters aura:id="checkDate" hasFromToDate="true" fromToDateLabel="Check Date" appTypeForDateFilter="UncashedChecks"
+                                        dateToValidate="{!v.dateToValidate}" dateValidationErrorMsg="{!v.dateValidationError}"   defaultFromDate="{! v.checkFromDate }" defaultToDate="{! v.checkToDate }"/>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_6-of-6 slds-large-size_3-of-12">
+                              <!--  <c:Atmos_Worklet_Filters hasQuickDate="false" placeHolder="Search by Employee Name, Check Number or Settlement" inputTextSize="40"   hasAutoCompleteSearch="true" />  -->
+                              <div class="slds-form-element" style="padding-top:0.10rem;" >
+                                <div class="slds-form-element__control slds-input-has-icon slds-input-has-icon_right">
+                                    <lightning:buttonIcon iconName="utility:search" variant="bare" onclick="{! c.searchTextChange }" 
+                                                          alternativeText="Search by Employee Name, Check Number or Settlement" 
+                                                          class="slds-input__icon" />
+                                    <ui:inputText value="{!v.searchText}" class="slds-lookup__search-input slds-input" label="Search" 
+                                                  placeholder="Search by Employee Name, Check Number or Settlement"  size="60" change="{! c.searchTextChange}"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_6-of-6 slds-large-size_3-of-12">
+                            <div style="text-align:right">
+                                <div> &nbsp;</div>
+                                <c:Atmos_Worklet_DownloadExcel downloadUrl="{!v.downloadUrl}" />
+                            </div>
+                        </div> 
+                     </div>
+                 </div>
+                 <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_12-of-12">
+                    Note: The information is reconciled as of 72 hours ago.
+                 </div> 
+                 <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_12-of-12">
+                    <div style="width:100%" class="slds-p-top_medium">
+                       <!-- <aura:if isTrue="{!v.isDoneLoading}"> -->
+                            <!--<div class="loadingDiv">
+                                <lightning:spinner variant="brand" size="large" alternativeText="Loading Treasury Exception Data"/>
+                            </div> -->
+                            <!--<aura:set attribute="else"> -->
+                                <c:Atmos_Worklet_GenericCustomDataTable saveFilter="false" uniqueFilterName="UC" table="{!v.uncashedChecksObject}" doneLoading="{!v.isDoneLoading}"   />
+                            <!--</aura:set>-->
+                        <!--</aura:if>-->
+                    </div>
+                </div>
+                <div class="slds-col slds-p-top--large slds-size_6-of-6 slds-medium-size_6-of-6 slds-large-size_12-of-12 ">
+                    <c:Atmos_Worklet_Pagination page="{!v.page}" totalCount="{!v.totalCount}" pages="{!v.pages}" />
+                </div>
+            </div>
+        </div>
+    </div>
+<!--</aura:renderIf>-->
+</aura:component>
+
+({
+    doInit: function(component, event, helper) {
+        component.set("v.isDoneLoading", false);
+        component.set("v.currentUserInfo", event.getParam("currentUserInfo"));
+        if (event.getParam("currentUserInfo") && event.getParam("currentUserInfo").accountDetails && event.getParam("currentUserInfo").accountDetails.Id) {
+            component.set("v.selectedAccountId", event.getParam("currentUserInfo").accountDetails.Id);
+        }
+        var page = component.get("v.page") || 1;
+        component.set("v.page", 1);
+        var pageSize = component.get("v.pageSize");
+        var sortField = component.get('v.sortField');
+        var isAsc = component.get("v.isAsc");
+        helper.getUrlParameter(component, event, helper);
+        helper.getDateValidationErrorMessage(component, event);
+        var today1 = new Date();
+        var startDate = new Date(component.get('v.dateToValidate'));
+        var tabFromUrl = component.get('v.tabFromUrl');
+        if (tabFromUrl && tabFromUrl == 'payrollUnCashedChecks') {
+            startDate = today1.setDate(today1.getDate() - 180);
+        }
+        var endDate = new Date();
+        component.set('v.checkFromDate', new Date(startDate).toISOString());
+        component.set('v.checkToDate', new Date(endDate).toISOString());
+        helper.getFilters(component, event, 'GetUncashedCheckStatusType', 'checkStatuses');
+        helper.getFilters(component, event, 'GetCurrencyType', 'currencies');
+
+        helper.getUnCashedChecksInformation(component, page, pageSize, sortField, isAsc);
+        helper.getExcelFile(component, page, pageSize, sortField, isAsc);
+
+        component.set('v.initializeComplete', true);
+    },
+    paginationChange: function(component, event, helper) {
+        component.set("{!v.isDoneLoading}", false);
+        var page = event.getParam("page");
+        var pages = event.getParam("pages");
+        var pageSize = event.getParam("pageSize");
+        component.set("{!v.pageSize}", pageSize);
+        component.set("{!v.page}", page);
+        component.set("{!v.pages}", pages);
+        var sortField = component.get('v.sortField');
+        var isAsc = component.get("v.isAsc");
+        if (component.get('v.initializeComplete')) {
+            helper.getUnCashedChecksInformation(component, page, pageSize, sortField, isAsc);
+            helper.getExcelFile(component, page, pageSize, sortField, isAsc);
+        }
+    },
+    searchTextChange: function(component, event, helper) {
+        component.set("{!v.isDoneLoading}", false);
+        var page = component.get("v.page");
+        var pageSize = component.get("v.pageSize");
+        var sortField = component.get('v.sortField');
+        var isAsc = component.get("v.isAsc");
+        if (component.get('v.initializeComplete') || event.getParams().keyCode == 13) {
+            component.set("v.isDoneLoading", false);
+            helper.getUnCashedChecksInformation(component, page, pageSize, sortField, isAsc);
+            helper.getExcelFile(component, page, pageSize, sortField, isAsc);
+        }
+    },
+    dateChange: function(component, event, helper) {
+        var page = component.get("v.page");
+        var pageSize = component.get("v.pageSize");
+        var sortField = component.get('v.sortField');
+        var isAsc = component.get("v.isAsc");
+        component.set('v.checkFromDate', event.getParam('fromDate'));
+        component.set('v.checkToDate', event.getParam('toDate'));
+        if (component.get('v.initializeComplete')) {
+            component.set("v.isDoneLoading", false);
+            component.set("v.searchText", event.getParam("searchText"));
+            helper.getUnCashedChecksInformation(component, page, pageSize, sortField, isAsc);
+            helper.getExcelFile(component, page, pageSize, sortField, isAsc);
+        }
+    },
+    customFilterChange: function(component, event, helper) {
+        var label = event.getSource().get("v.label");
+        if (label == 'Status' && event.getParam("selectedOption") != component.get('v.checkStatus')) {
+            component.set("v.checkStatus", event.getParam("selectedOption"));
+        }
+
+        if (label == 'Currency' && event.getParam("selectedOption") != component.get('v.currency')) {
+            component.set("v.currency", event.getParam("selectedOption"));
+        }
+        component.set("v.isDoneLoading", false);
+        var page = component.get("v.page");
+        var pageSize = component.get("v.pageSize");
+        var sortField = component.get('v.sortField');
+        var isAsc = component.get("v.isAsc");
+        if (component.get('v.initializeComplete')) {
+            helper.getUnCashedChecksInformation(component, page, pageSize, sortField, isAsc);
+            helper.getExcelFile(component, page, pageSize, sortField, isAsc);
+        }
+    },
+    updateColumnSorting: function(component, event, helper) {
+        var pageSize = component.get("v.pageSize");
+        component.set("v.sortField", event.getParam("sortField"));
+        component.set("v.isAsc", event.getParam("isAsc"));
+        var page = component.get("v.page");
+        if (component.get('v.initializeComplete')) {
+            helper.getUnCashedChecksInformation(component, page, pageSize, event.getParam("sortField"), event.getParam("isAsc"));
+            helper.getExcelFile(component, page, pageSize, event.getParam("sortField"), event.getParam("isAsc"));
+        }
+    }
+})
+
+({
+    getFilters: function(component, event, actionName, fieldName) {
+        var filterActionName = "c." + actionName;
+        var action = component.get(filterActionName);
+        action.setCallback(this, function(data) {
+            var state = data.getState();
+            if (state === 'SUCCESS') {
+                var fieldToPopulate = "v." + fieldName;
+                component.set('v.shouldRender', true);
+                component.set(fieldToPopulate, data.getReturnValue());
+                console.log('Filters: ' + JSON.stringify(data.getReturnValue()));
+            }
+        });
+        $A.enqueueAction(action);
+    },
+    getUnCashedChecksInformation: function(component, page, recordToDisplay, sortField, isAsc) {
+        var accountId = component.get("v.selectedAccountId");
+        var currency = component.get('v.currency');
+        var checkStatus = component.get('v.checkStatus');
+        var fromDate = component.get('v.checkFromDate');
+        var toDate = component.get('v.checkToDate');
+        var searchText = component.get('v.searchText');
+        var action = component.get("c.GetUnCashedCheckList");
+        action.setParams({
+            pageNumber: page,
+            recordToDisplay: recordToDisplay,
+            fromDate: fromDate,
+            toDate: toDate,
+            checkStatus: checkStatus,
+            selectedCurrency: currency,
+            sortField: sortField,
+            isAsc: isAsc,
+            accountId: accountId,
+            searchText: searchText,
+            isExcelDownload: false
+        });
+        action.setCallback(this, function(data) {
+            var state = data.getState();
+            if (state === 'SUCCESS') {
+                component.set("v.isDoneLoading", true);
+                var pageRecords = data.getReturnValue();
+                component.set("v.uncashedChecksObject", pageRecords);
+                component.set("v.page", data.getReturnValue().Page);
+                component.set("v.totalCount", data.getReturnValue().Total);
+                component.set("v.pages", Math.ceil(data.getReturnValue().Total / recordToDisplay));
+            }
+        });
+        $A.enqueueAction(action);
+    },
+    getExcelFile: function(component, page, pageSize, sortField, isAsc) {
+        var fromDate = component.get('v.checkFromDate');
+        var toDate = component.get('v.checkToDate');
+        var accountId = component.get("v.selectedAccountId");
+        var currency = component.get('v.currency');
+        var checkStatus = component.get('v.checkStatus');
+        var searchText = component.get('v.searchText');
+        var urlParameter = "?pageNumber=" + page + "&recordToDisplay=" + pageSize + "&fromDate=" + fromDate + "&toDate=" + toDate + "&selectedCurrency=" + currency +
+            "&sortField=" + sortField + "&isAsc=" + isAsc + "&accountId=" + accountId + "&searchText=" + searchText + "&checkStatus=" + checkStatus + "&appType=unCashedStatusDetail";
+        var url = "../apex/Atmos_VF_GenericExcelDownloadpage" + urlParameter;
+        component.set("v.downloadUrl", url);
+    },
+    getUrlParameter: function(component, event, helper) {
+        var getUrlParameter = function getUrlParameter(sParam) {
+            var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+                sURLVariables = sPageURL.split('&'),
+                sParameterName,
+                i;
+
+            for (i = 0; i < sURLVariables.length; i++) {
+                sParameterName = sURLVariables[i].split('=');
+
+                if (sParameterName[0] === sParam) {
+                    return sParameterName[1] === undefined ? true : sParameterName[1];
+                }
+            }
+        };
+        var countries = getUrlParameter("cntry");
+        if (countries) {
+            if (!countries.includes('USA') && countries.includes('CANADA')) {
+                component.set('v.currency', 'CAD');
+            } else if (countries.includes('USA') && !countries.includes('CANADA')) {
+                component.set('v.currency', 'USD');
+            } else {
+                component.set('v.currency', 'ALL');
+            }
+        }
+
+        var status = getUrlParameter("checkStatus");
+        if (status) {
+            component.set('v.checkStatus', status);
+        }
+        var tabFromUrl = getUrlParameter("tab");
+        if (tabFromUrl) {
+            if (tabFromUrl.includes('payrollUnCashedChecks')) {
+                component.set('v.tabFromUrl', tabFromUrl);
+            }
+        }
+    },
+    getDateValidationErrorMessage: function(component, event) {
+        var action = component.get("c.GetPayrollDateToValidate");
+        action.setCallback(this, function(data) {
+            var state = data.getState();
+            if (state === 'SUCCESS') {
+                var date = data.getReturnValue();
+                component.set('v.dateToValidate', date);
+                date = date.split("-");
+                var errorMessages = [];
+                var msg1 = { 'message': 'Dates prior to ' + date[2] + '/' + date[1] + '/' + date[0] + ' have been' }
+                var msg2 = { 'message': 'archived, please submit an OSVS case' }
+                var msg3 = { 'message': 'to request that info.' }
+                errorMessages.push(msg1);
+                errorMessages.push(msg2);
+                errorMessages.push(msg3);
+                component.set('v.dateValidationError', errorMessages);
+            }
+        });
+        $A.enqueueAction(action);
+    }
+})
+@AuraEnabled
+    public static Atmos_Object_GenericTable GetUnCashedCheckList(Decimal pageNumber, Integer recordToDisplay,
+                                                                    string fromDate, string toDate, string checkStatus, string selectedCurrency, 
+                                                                    string sortField, boolean isAsc, string accountId, string searchText, Boolean isExcelDownload){
+       System.debug('CurrencyFilter: '+ selectedCurrency + ' pageNumber: '+ pageNumber + ' recordToDisplay: '+ recordToDisplay + ' fromDate: '+ fromDate + ' toDate: '+ toDate+
+                        ' checkStatus: '+ checkStatus + ' sortField: '+ sortField + ' isAsc: '+ isAsc + ' accountId: '+ accountId + ' searchText: '+ searchText );
+       Integer pageSize = recordToDisplay;
+       Integer offset = ((Integer)pageNumber - 1) * pageSize;   
+       Atmos_Object_GenericTable response = new Atmos_Object_GenericTable();
+       try{
+            if(string.isBlank(accountId)){
+                accountId = GetAccountId();
+            }
+            
+             if(string.isBlank(accountId)){
+                return response;
+            } 
+           
+           Date fromDt = Date.Valueof(fromDate);
+           Date toDt = Date.Valueof(toDate);
+           String strFdate =  DateTime.newInstance(fromDt.year(), fromDt.month(), fromDt.day()).format('yyyy-MM-dd\'T\'hh:mm:ss\'Z\'');
+           String strTDate  = DateTime.newInstance(toDt.year(), toDt.month(), toDt.day()).format('yyyy-MM-dd\'T\'hh:mm:ss\'Z\'');
+           string currencyFilter = Atmos_TreasuryException_MainUtilities.GetCurrencyFilter(selectedCurrency);
+          
+           List<Check_Register__c> checkRegisters = Atmos_UncashedChecks_MainHelper.GetUncashedChecksHelper(pageNumber, recordToDisplay,
+           strFdate, strTDate, checkStatus, selectedCurrency,  sortField, isAsc, accountId, searchText);
+          
+           Integer checkRegisterSize = Atmos_UncashedChecks_MainHelper.TotalUnCashedCheckSize;
+           System.debug('CurrencyFilter: '+ selectedCurrency + ' pageNumber: '+ pageNumber + ' recordToDisplay: '+ recordToDisplay + ' fromDate: '+ fromDate + ' toDate: '+ toDate+
+                        ' checkStatus: '+ checkStatus + ' sortField: '+ sortField + ' isAsc: '+ isAsc + ' accountId: '+ accountId + ' totalCheckSize: '+ Atmos_UncashedChecks_MainHelper.TotalUnCashedCheckSize);
+           List<Map<String, object>> listMapChkRegister = new List<Map<String, object>>();
+           if(checkRegisters != null && checkRegisters.size() > 0){
+               for(Check_Register__c cregister : checkRegisters){
+                    Map<String, object> maps = new Map<String, object>();
+                    maps.put('Payee_Name__c', string.isNotBlank(cregister.Payee_Name__c) ? cregister.Payee_Name__c : ' ');
+                    maps.put('PayGroup__c', cregister.PayGroup__c != null ?  cregister.PayGroup__c : ' ');
+                    maps.put('Settlement__c', cregister.Settlement__c != null ? cregister.Settlement__r.Name : ' ');
+                    maps.put('Check_Number__c', string.isNotBlank(cregister.Check_Number__c) != null ? cregister.Check_Number__c : ' ');
+                    maps.put('Check_Amount__c', cregister.Check_Amount__c != null ? cregister.Check_Amount__c : 0);
+                    maps.put('Check_Date__c',  cregister.Check_Date__c != null?  DateTime.newInstance(
+                                               cregister.Check_Date__c.year(), cregister.Check_Date__c.month(), 
+                                               cregister.Check_Date__c.day()).format('MM/dd/yyyy') : ' ');
+                    string strChkStatus = cregister.Status__c;
+                    if(string.isNotBlank(strChkStatus)){
+                        if(strChkStatus.equalsIgnoreCase('Check Stop')){ strChkStatus = 'STOP PAYMENT'; }
+                        if(strChkStatus.equalsIgnoreCase('Issued')) { strChkStatus = 'UNCASHED'; }
+                    }
+                    maps.put('Status__c', string.isNotBlank(strChkStatus) ? strChkStatus : ' ');
+                    maps.put('CurrencyIsoCode', string.isNotBlank(cregister.CurrencyIsoCode) ? cregister.CurrencyIsoCode : ' ');
+                    maps.put('Count_of_Days_Outstanding__c', cregister.Count_of_Days_Outstanding__c != null ?  cregister.Count_of_Days_Outstanding__c : 0);
+                    maps.put('Shipment_Method__c', string.isNotBlank(cregister.Shipment_Method__c) ? cregister.Shipment_Method__c : 'Not Available');
+                    maps.put('Tracking_ID__c', string.isNotBlank(cregister.Tracking_ID__c) ? cregister.Tracking_ID__c : 'Not Available');
+                    if(isExcelDownload != null && isExcelDownload == true){
+                        maps.put('Return_Check__c', string.isNotBlank(cregister.Return_Check__c) && cregister.Return_Check__c.equalsIgnoreCase('Processed') ? 'Yes' : 'No' );
+                    }else{
+                        maps.put('Return_Check__c', string.isNotBlank(cregister.Return_Check__c) && cregister.Return_Check__c.equalsIgnoreCase('Processed') ? 'Yes' : ' ' );
+                    }
+                    maps.put('LastModifiedDate', cregister.LastModifiedDate != null?  DateTime.newInstance(
+                                                 cregister.LastModifiedDate.year(), cregister.LastModifiedDate.month(), 
+                                                 cregister.LastModifiedDate.day()).format('MM/dd/yyyy') : ' ');
+                    listMapChkRegister.add(maps);
+               }
+           }
+           response.Data = listMapChkRegister;
+           response.Columns = Atmos_UncashedChecks_MainHelper.GetListOfColumns();
+           response.PageSize = pageSize;
+           response.Page = (Integer) pageNumber;
+           response.Total = checkRegisterSize;
+           response.Name = 'UnCashed Checks Detail';
+       }
+       catch(Exception ex){
+           System.debug('Exception: '+ ex.getMessage());
+           throw ex;
+       }
+       return response;
+    }
+    
+    
+    public static integer TotalUnCashedCheckSize = 0;
+    public static Integer GetUncashedChecksCountHelper(string fromDate, string toDate, string currencyFilter, string accountId){
+        Integer uncashedChecksCount = 0;
+        List<String> filterClauses = new List<String>();
+        if(string.isBlank(accountId)){
+            accountId = GetAccountId();
+        }
+        if(string.isBlank(accountId)){
+            return uncashedChecksCount;
+        } 
+        if(string.isNotBlank(accountId)){
+            filterClauses.add('account__c = \''+ accountId + '\'');
+        } else { return uncashedChecksCount; }
+        string defaultStatus = 'Issued';
+        filterClauses.add('Status__c = \''+ defaultStatus + '\'');
+
+        Date dtFromDate = Date.valueOf(fromDate);
+        String strFromDate = String.valueOf(dtFromDate);
+        Date dtToDate = Date.valueOf(toDate);
+        String strToDate = String.valueOf(dtToDate);
+        string dateClause = SOQLQueryUtility.createSOQLDateFilterClause('Check_Date__c', strFromDate, strToDate);
+        string type = 'Payroll';
+        filterClauses.add('Type__c = \''+ type + '\'');
+
+        if(string.isNotBlank(dateClause)){
+            filterClauses.add(dateClause);
+        }
+        if(string.isNotBlank(currencyFilter)){
+            filterClauses.add('CurrencyIsoCode IN ('+ currencyFilter +')');
+        }
+        uncashedChecksCount = TotalUncashedChecksSize(filterClauses);
+        return uncashedChecksCount;
+    }
+    
+    public static List<Check_Register__c> GetUncashedChecksHelper(Decimal pageNumber, Integer recordToDisplay,
+                                                                    string fromDate, string toDate, string status, string currencyFilter, 
+                                                                    string sortField, boolean isAsc,string accountId, string searchText){
+        List<Check_Register__c> checkRegisters = new List<Check_Register__c>();
+        Integer pageSize = recordToDisplay;
+        Integer offset = ((Integer)pageNumber - 1) * pageSize;    
+        List<String> filterClauses = new List<String>();
+        if(string.isBlank(accountId)){
+            accountId = GetAccountId();
+        }
+        if(string.isBlank(accountId)){
+            return checkRegisters;
+        }                                                                 
+                                                                        
+        if(string.isNotBlank(accountId)){
+            filterClauses.add('account__c = \''+ accountId + '\'');
+        } else { return checkRegisters; }
+        Date dtFromDate = Date.valueOf(fromDate);
+        String strFromDate = String.valueOf(dtFromDate);
+        Date dtToDate = Date.valueOf(toDate);
+        String strToDate = String.valueOf(dtToDate);
+        string dateClause = SOQLQueryUtility.createSOQLDateFilterClause('Check_Date__c', strFromDate, strToDate);
+        if(string.isNotBlank(dateClause)){
+            filterClauses.add(dateClause);
+        }
+        string strCurrencyType = Atmos_TreasuryException_MainUtilities.GetCurrencyFilter(currencyFilter);
+        if(string.isNotBlank(status)){
+            string strStatus = Atmos_UncashedChecks_MainUtilities.GetStatusType(status);
+            filterClauses.add('Status__c IN ('+ strStatus +')');
+        }
+        if(string.isNotBlank(strCurrencyType)){
+            filterClauses.add('CurrencyIsoCode IN ('+ strCurrencyType +')');
+        }
+        
+        string type = 'Payroll';
+        filterClauses.add('Type__c = \''+ type + '\'');
+        
+        if(string.isNotBlank(searchText))
+        {
+            filterClauses.add(' ((Payee_Name__c LIKE \'%' + searchText + '%\')'+
+                                ' OR (Check_Number__c LIKE \'%'+ searchText + '%\')'+
+                                ' OR (Settlement__r.Name LIKE \'%' + searchText + '%\'))');
+        }
+
+        TotalUnCashedCheckSize = TotalUncashedChecksSize(filterClauses);
+        List<string> additionalClauses = new List<string>();
+        additionalClauses.add('ORDER BY ' + sortField + (isAsc?' ASC':' DESC') +' NULLS LAST, Name' + (isAsc?' ASC':' DESC'));
+        //additionalClauses.add('ORDER BY Check_Date__c ASC');
+        additionalClauses.add('limit '+ recordToDisplay);
+        additionalClauses.add('OFFSET ' + offset);
+        string soqlCheckRegisters = SOQLQueryUtility.CreateSOQLQuery(Atmos_UncashedChecks_MainUtilities.checkRegisterFieldsArray, 'Check_Register__c', filterClauses, additionalClauses);  
+        checkRegisters = Database.query(soqlCheckRegisters);
+        System.debug('SOQL CheckRegisters query: '+ soqlCheckRegisters);
+        return checkRegisters;                                                                
+    }
+    public static List<Atmos_Object_GenericTable.Column> GetListOfColumns(){
+        List<Atmos_Object_GenericTable.Column> columns = new List<Atmos_Object_GenericTable.Column>();
+        try{
+            Atmos_Object_GenericTable.Column column0 = new Atmos_Object_GenericTable.Column('Employee Name', 'Payee_Name__c', 'text', true, true);
+            columns.add(column0);
+            Atmos_Object_GenericTable.Column column1 = new Atmos_Object_GenericTable.Column('Pay Group', 'PayGroup__c', 'text', true, true);
+            columns.add(column1);
+            Atmos_Object_GenericTable.Column column2 = new Atmos_Object_GenericTable.Column('Settlement', 'Settlement__c', 'text', true, true);
+            columns.add(column2);
+            Atmos_Object_GenericTable.Column column3 = new Atmos_Object_GenericTable.Column('Check Number', 'Check_Number__c', 'text', true, true);
+            columns.add(column3);
+            Atmos_Object_GenericTable.Column column3a = new Atmos_Object_GenericTable.Column('Check Amount', 'Check_Amount__c', 'currency', true, true);
+            columns.add(column3a);
+            Atmos_Object_GenericTable.Column column4 = new Atmos_Object_GenericTable.Column('Check Date', 'Check_Date__c', 'text', true, true);
+            columns.add(column4);
+            Atmos_Object_GenericTable.Column column5 = new Atmos_Object_GenericTable.Column('Status', 'Status__c', 'text', true, true);
+            columns.add(column5);
+            Atmos_Object_GenericTable.Column column6 = new Atmos_Object_GenericTable.Column('Currency', 'CurrencyIsoCode', 'text', true, true);
+            columns.add(column6);
+            Atmos_Object_GenericTable.Column column7 = new Atmos_Object_GenericTable.Column('Outstanding Days', 'Count_of_Days_Outstanding__c', 'number', true, true);
+            columns.add(column7);
+            Atmos_Object_GenericTable.Column column8 = new Atmos_Object_GenericTable.Column('Shipping Method', 'Shipment_Method__c', 'text', true, true);
+            columns.add(column8);
+            Atmos_Object_GenericTable.Column column9 = new Atmos_Object_GenericTable.Column('Tracking ID', 'Tracking_ID__c', 'text', true, true);
+            columns.add(column9);
+            Atmos_Object_GenericTable.Column column9a = new Atmos_Object_GenericTable.Column('Check Returned', 'Return_Check__c', 'text', true, true, 'color: #EF4123 !important');
+            columns.add(column9a);
+            Atmos_Object_GenericTable.Column column10 = new Atmos_Object_GenericTable.Column('Last Modified', 'LastModifiedDate', 'text', true, true);
+            columns.add(column10);
+        }
+        catch(Exception ex) {
+            throw ex;
+        }
+        return columns;
+    } 
+    
+    public static string[] checkRegisterFieldsArray = new string[]{'Payee_Name__c', 'PayGroup__c', 'Settlement__r.Name', 
+        'Check_Number__c', 'Check_Amount__c', 'Check_Date__c', 'Status__c', 'CurrencyIsoCode', 'Count_of_Days_Outstanding__c', 'Shipment_Method__c', 
+        'Tracking_ID__c', 'LastModifiedDate', 'Return_Check__c'}; 
+        
+@isTest
+public class Atmos_UncashedChecks_MainCtrlTest {
+    @testSetup 
+    static void TestSetup() {
+        User thisUser = [ select Id from User where Id = :UserInfo.getUserId() ];
+        System.runAs ( thisUser ) {
+            // Map which store a mapping: key = Bank Name and value = Bank Id
+            Map<string, ID> vhrMap = Test_Utility_Common.createVHRBanks();
+            Map<string, ID> vhrProcBankMap = Test_Utility_Common.createProcBanks();
+
+            // Create Account
+            Account a1 = Test_Utility_Common.createAccount('GMSTEST');
+            insert a1;
+
+            a1 = [SELECT Id FROM Account WHERE Name LIKE '%GMSTEST%' LIMIT 1];
+
+            Contact testContact = Test_Utility_Common.CreateContact('Test', 'Contact', 'Test Title', 'demouser9865@osv.com', a1.Id);
+            
+            // Create Tenant
+            Tenant__c t1 = Test_Utility_Common.createTenant('gms', a1.ID, true);
+            insert t1;
+            
+            // Create Company
+            Company__c c1= Test_Utility_Common.createCompany('ABC WF', a1.ID);
+            insert c1;
+
+
+            // Create Case
+            Id caseRecordType = Schema.SObjectType.Case.getRecordTypeInfosByName().get('AMS: Default').getRecordTypeId();
+            Case cs1 = Test_Utility_Common.CreateCase(a1.Id, 'string subject', caseRecordType, 'Web', 'AMS Invoices', 'AMS', testContact.Id);
+            insert cs1;
+            
+            Check_Register__c cr1 = new Check_Register__c();
+            cr1.Account__c = a1.Id;
+            cr1.Type__c = 'Payroll';
+            cr1.Status__c = 'Issued';
+            cr1.Payee_Name__c = 'Test Payee';
+            cr1.Check_Number__c = '10001';
+            cr1.Check_Amount__c = 101.55;
+            cr1.Check_Date__c = Date.newInstance(2020, 1, 1);
+            cr1.Check_Register_External_Id__c = 'Ext12345Id';
+            cr1.Tenant__c = t1.Id;
+            cr1.Processing_Bank__c = 'Toronto Dominion';
+            cr1.CurrencyIsoCode = 'USD';
+
+            insert cr1;
+
+            cr1 = [SELECT Payee_Name__c,PayGroup__c,Settlement__r.Name,Check_Number__c,Check_Date__c,Status__c,CurrencyIsoCode,
+                        Count_of_Days_Outstanding__c,LastModifiedDate FROM Check_Register__c WHERE account__c = :a1.Id 
+                        AND Check_Date__c >= 2019-08-21 AND Check_Date__c <= 2020-01-18 AND Status__c IN ('Issued','Void','Paid','Check Stop') 
+                        AND CurrencyIsoCode IN ('USD','CAD') ORDER BY Check_Date__c DESC NULLS LAST];
+            System.debug('CHECK: ' + cr1);                            
+        }
+    }
+
+    @isTest
+    static void PayrollAppUncashedChecksTest(){
+
+        Account a1 = [SELECT Id, Name FROM Account WHERE Name LIKE '%GMSTEST%'];
+        
+        PageReference pageRef = ApexPages.currentPage();
+        pageRef.getParameters().put('fromDate', '2019-08-21');
+        pageRef.getParameters().put('toDate', '2020-01-18');
+        pageRef.getParameters().put('sortField', 'Check_Date__c');
+        pageRef.getParameters().put('isAsc', 'false');
+        pageRef.getParameters().put('checkStatus', 'ALL');
+        pageRef.getParameters().put('selectedCurrency', 'ALL');
+        pageRef.getParameters().put('accountId', a1.Id);
+        pageRef.getParameters().put('searchText', 'payee');
+
+        User currentUserInfo = [SELECT Account_Id__c FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        String accountId = '';
+        if(currentUserInfo.Account_Id__c != null) {
+            accountId = currentUserInfo.Account_Id__c;
+        }
+        
+        Test.StartTest();
+        System.assertEquals(Atmos_UncashedChecks_MainController.GetUnCashedCheckList(1, 10, '2019-08-21', '2020-01-18', 'UNCASHED', 'ALL', 
+                                                                                        'Check_Date__c', true, a1.Id, 'payee', false).Total, 1);
+        System.assertEquals(Atmos_UncashedChecks_MainController.ProcessUncashedCheckExcelDownload(pageRef).Name, 'UnCashed Checks Detail');
+        System.assertEquals(Atmos_UncashedChecks_MainHelper.GetUncashedChecksCountHelper('2019-08-21', '2020-01-18', 
+                            Atmos_UncashedChecks_MainUtilities.GetCurrencyFilter(true, false),  a1.Id), 1);
+
+        System.assertEquals(Atmos_UncashedChecks_MainController.GetUncashedCheckStatusType().size(), 5);
+        System.assertEquals(Atmos_UncashedChecks_MainController.GetCurrencyType().size(), 3);   
+        
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetCurrencyFilter(true, true), '\'USD\',\'CAD\'');
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetCurrencyFilter('CAD'), '\'CAD\'');
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetStatusType('PAID'), '\'Paid\'');
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetStatusType('STOP PAYMENT'), '\'Check Stop\'');
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetStatusType('UNCASHED'), '\'Issued\'');
+        System.assertEquals(Atmos_UncashedChecks_MainUtilities.GetStatusType('VOID'), '\'Void\'');
+        System.assertEquals(Atmos_UncashedChecks_MainHelper.ParseListStringToFilterClause(new List<String>{'USD','CAD'}), '(CurrencyISOCode = \'USD\' OR CurrencyISOCode = \'CAD\')');
+        
+        System.assertEquals(Atmos_UncashedChecks_MainHelper.GetAccountId(), accountId);
+        Test.StopTest();
+        
+    }
+}
+        
